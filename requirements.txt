@@ -1,0 +1,4 @@
+flet==0.80.2
+pydub
+audioop-lts
+playsound==1.2.2
