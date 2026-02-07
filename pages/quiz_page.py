@@ -1,0 +1,237 @@
+import random
+import flet as ft
+from db import supabase
+from config import CATEGORY_COLORS
+from helpers import normalise, fuzzy_match, wrap_text, safe_data
+from filters import build_multiselect_filter, build_topic_checkbox_filter
+
+
+def build_quiz_page(
+    page,
+    categories,
+    topics,
+    selected_categories,
+    selected_topics,
+    notify,
+):
+
+    # ---------------- Filters ----------------
+    category_filter = build_multiselect_filter(
+        "Categories", categories, selected_categories, page, CATEGORY_COLORS
+    )
+    topic_filter = build_topic_checkbox_filter(
+        "Topics", topics, selected_topics, page
+    )
+
+    max_questions = ft.Dropdown(
+        label="Max Questions",
+        options=[ft.dropdown.Option(str(x)) for x in [1, 10, 20, 50, 100]]
+        + [ft.dropdown.Option("All")],
+        value="All",
+        width=200,
+    )
+
+    # ---------------- State ----------------
+    asked_ids = set()
+    score = {"correct": 0, "total": 0}
+    voted_set = set()
+    current_q = {}
+    question_pool = []
+
+    # ---------------- Quiz UI ----------------
+    progress = ft.ProgressBar(width=600)
+    progress_label = ft.Text()
+    question_text = ft.Text(size=30, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER)
+    question_image = ft.Image(src="", width=600, height=350, fit="contain", visible=False)
+    category_box = ft.Container(padding=6, border_radius=6)
+    submitted_by = ft.Text(italic=True)
+    answer = ft.TextField(label="Your answer", width=600)
+    feedback = ft.Text(size=16)
+    submit_btn = ft.ElevatedButton("Submit")
+    next_btn = ft.TextButton("Next", visible=False)
+    final_score = ft.Text(size=42, weight=ft.FontWeight.BOLD, visible=False)
+
+    upvote_btn = ft.IconButton(icon=ft.Icons.THUMB_UP, icon_color=ft.Colors.GREEN)
+    downvote_btn = ft.IconButton(icon=ft.Icons.THUMB_DOWN, icon_color=ft.Colors.RED)
+    vote_label = ft.Text()
+    voting_row = ft.Row([upvote_btn, downvote_btn, vote_label], alignment=ft.MainAxisAlignment.CENTER)
+
+    quiz_block = ft.Column(
+        [
+            progress,
+            progress_label,
+            ft.Row([question_text, category_box], alignment=ft.MainAxisAlignment.CENTER),
+            question_image,
+            submitted_by,
+            answer,
+            submit_btn,
+            feedback,
+            voting_row,
+            next_btn,
+            final_score,
+        ],
+        visible=False,
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        spacing=10,
+    )
+
+    # ---------------- Helper Functions ----------------
+    def notify_vote(msg):
+        notify(msg)
+
+    def vote(val):
+        qid = current_q.get("question_id")
+        if not qid:
+            notify_vote("No active question")
+            return
+        if qid in voted_set:
+            notify_vote("You already voted on this question")
+            return
+
+        field = "upvotes" if val == 1 else "downvotes"
+        try:
+            supabase.table("questions").update(
+                {field: current_q.get(field, 0) + 1}
+            ).eq("question_id", qid).execute()
+
+            current_q[field] = current_q.get(field, 0) + 1
+            voted_set.add(qid)
+
+            upvote_btn.disabled = True
+            downvote_btn.disabled = True
+
+            show_vote_stats(current_q)
+            notify_vote("Thanks for voting 👍" if val == 1 else "Vote recorded 👎")
+            page.update()
+        except Exception as e:
+            notify_vote(f"Vote failed: {e}")
+
+    upvote_btn.on_click = lambda e: vote(1)
+    downvote_btn.on_click = lambda e: vote(-1)
+
+    def get_questions():
+        query = supabase.table("questions").select("*")
+        if selected_categories and len(selected_categories) != len(categories):
+            query = query.in_("category", list(selected_categories))
+        if selected_topics and len(selected_topics) != len(topics):
+            query = query.in_("topic", list(selected_topics))
+        result = query.execute().data or []
+        random.shuffle(result)
+        if max_questions.value != "All":
+            result = result[: int(max_questions.value)]
+        return result
+
+    def show_vote_stats(q):
+        ups, downs = q.get("upvotes", 0), q.get("downvotes", 0)
+        total = ups + downs
+        vote_label.value = "No votes yet" if total == 0 else f"👍 {ups} / 👎 {downs}"
+        page.update()
+
+    # ---------------- Quiz Logic ----------------
+    def load_question():
+        available = [q for q in question_pool if q["question_id"] not in asked_ids]
+        if not available:
+            final_score.value = f"Final Score: {score['correct']} / {score['total']}"
+            final_score.visible = True
+            page.update()
+            return
+
+        q = random.choice(available)
+        asked_ids.add(q["question_id"])
+        current_q.clear()
+        current_q.update(q)
+
+        # Reset voting buttons
+        upvote_btn.disabled = False
+        downvote_btn.disabled = False
+
+        # Question text
+        question_text.value = wrap_text(q.get("question", ""))
+
+        # Image
+        if q.get("image_url"):
+            question_image.src = q["image_url"]
+            question_image.visible = True
+        else:
+            question_image.visible = False
+
+        # Category
+        category_box.content = ft.Text(q.get("category",""), weight=ft.FontWeight.BOLD)
+        category_box.bgcolor = CATEGORY_COLORS.get(q.get("category"), ft.Colors.GREY)
+
+        # Answer & feedback
+        answer.value = ""
+        answer.disabled = False
+        feedback.value = ""
+        next_btn.visible = False
+
+        # Progress
+        progress.value = len(asked_ids) / len(question_pool)
+        progress_label.value = f"Question {len(asked_ids)} of {len(question_pool)}"
+        submitted_by.value = f"Submitted by: {safe_data(q.get('submitted_by'))}"
+
+        show_vote_stats(q)
+        page.update()
+
+    def check_answer(e):
+        user = normalise(answer.value)
+        correct = normalise(current_q.get("answer",""))
+        ok = user == correct or fuzzy_match(user, correct)
+
+        score["total"] += 1
+        if ok:
+            score["correct"] += 1
+            feedback.value = "✅ Correct!"
+            feedback.color = ft.Colors.GREEN
+        else:
+            feedback.value = f"❌ Wrong — {current_q.get('answer','')}"
+            feedback.color = ft.Colors.RED
+
+        answer.disabled = True
+        next_btn.visible = True
+        page.update()
+
+    def start_quiz(e):
+        nonlocal question_pool
+        question_pool = get_questions()
+        if not question_pool:
+            notify("No matching questions")
+            return
+        asked_ids.clear()
+        score.update(correct=0, total=0)
+        quiz_block.visible = True
+        load_question()
+
+    submit_btn.on_click = check_answer
+    next_btn.on_click = lambda e: load_question()
+
+    # ---------------- Layout ----------------
+    return [
+        ft.Row(
+            [
+                ft.Container(
+                    width=280,
+                    padding=10,
+                    content=ft.Column(
+                        [
+                            ft.Text("Filters", weight=ft.FontWeight.BOLD),
+                            category_filter,
+                            topic_filter,
+                            max_questions,
+                        ]
+                    ),
+                ),
+                ft.VerticalDivider(),
+                ft.Container(
+                    expand=True,
+                    padding=10,
+                    content=ft.Column(
+                        [
+                            ft.ElevatedButton("▶️ Start Quiz", on_click=start_quiz),
+                            quiz_block,
+                        ]
+                    ),
+                ),
+            ]
+        )
+    ]
