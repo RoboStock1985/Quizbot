@@ -11,7 +11,7 @@ CATEGORY_COLORS = {
     "Science & Nature": ft.Colors.GREEN,
     "Sports & Leisure": ft.Colors.ORANGE,
     "Technology": ft.Colors.CYAN,
-    "Film": ft.Colors.RED,
+    "TV & Film": ft.Colors.RED,
     "Music": ft.Colors.LIGHT_BLUE,
     "Food & Drink": ft.Colors.BROWN,
     "Miscellaneous": ft.Colors.GREY,

@@ -41,12 +41,32 @@ def build_quiz_page(
     # ---------------- Quiz UI ----------------
     progress = ft.ProgressBar(width=600)
     progress_label = ft.Text()
-    question_text = ft.Text(size=30, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER)
+    question_text = ft.Text(
+        size=30, 
+        weight=ft.FontWeight.BOLD, 
+        text_align=ft.TextAlign.CENTER,
+    )
+    # Fixed height container for question text to prevent movement
+    question_container = ft.Container(
+        content=question_text,
+        height=120,  # Fixed height for question area
+        width=600,
+        alignment=ft.Alignment(0,0),
+    )
+    
     question_image = ft.Image(src="", width=600, height=350, fit="contain", visible=False)
+    # Fixed height container for image to prevent movement when not visible
+    image_container = ft.Container(
+        content=question_image,
+        height=350,  # Always reserve space for image
+        width=600,
+        alignment=ft.Alignment(0,0),
+    )
+    
     category_box = ft.Container(padding=6, border_radius=6)
     submitted_by = ft.Text(italic=True)
     answer = ft.TextField(label="Your answer", width=600)
-    feedback = ft.Text(size=16)
+    feedback = ft.Text(size=16, height=30)  # Fixed height for feedback
     submit_btn = ft.ElevatedButton("Submit")
     next_btn = ft.TextButton("Next", visible=False)
     final_score = ft.Text(size=42, weight=ft.FontWeight.BOLD, visible=False)
@@ -56,12 +76,15 @@ def build_quiz_page(
     vote_label = ft.Text()
     voting_row = ft.Row([upvote_btn, downvote_btn, vote_label], alignment=ft.MainAxisAlignment.CENTER)
 
+    start_quiz_btn = ft.ElevatedButton("▶️ Start New Quiz", visible=False)
+
     quiz_block = ft.Column(
         [
             progress,
             progress_label,
-            ft.Row([question_text, category_box], alignment=ft.MainAxisAlignment.CENTER),
-            question_image,
+            ft.Row([category_box], alignment=ft.MainAxisAlignment.CENTER),
+            question_container,
+            image_container,
             submitted_by,
             answer,
             submit_btn,
@@ -69,11 +92,15 @@ def build_quiz_page(
             voting_row,
             next_btn,
             final_score,
+            start_quiz_btn,
         ],
         visible=False,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         spacing=10,
     )
+
+    # Start button that appears before quiz begins
+    initial_start_btn = ft.ElevatedButton("▶️ Start New Quiz", visible=True)
 
     # ---------------- Helper Functions ----------------
     def notify_vote(msg):
@@ -133,6 +160,7 @@ def build_quiz_page(
         if not available:
             final_score.value = f"Final Score: {score['correct']} / {score['total']}"
             final_score.visible = True
+            start_quiz_btn.visible = True
             page.update()
             return
 
@@ -153,6 +181,7 @@ def build_quiz_page(
             question_image.src = q["image_url"]
             question_image.visible = True
         else:
+            question_image.src = ""
             question_image.visible = False
 
         # Category
@@ -164,6 +193,8 @@ def build_quiz_page(
         answer.disabled = False
         feedback.value = ""
         next_btn.visible = False
+        final_score.visible = False
+        start_quiz_btn.visible = False
 
         # Progress
         progress.value = len(asked_ids) / len(question_pool)
@@ -199,39 +230,48 @@ def build_quiz_page(
             return
         asked_ids.clear()
         score.update(correct=0, total=0)
+        initial_start_btn.visible = False
         quiz_block.visible = True
         load_question()
 
     submit_btn.on_click = check_answer
     next_btn.on_click = lambda e: load_question()
+    initial_start_btn.on_click = start_quiz
+    start_quiz_btn.on_click = start_quiz
 
-    # ---------------- Layout ----------------
+# ---------------- Layout ----------------
     return [
         ft.Row(
             [
                 ft.Container(
                     width=280,
                     padding=10,
+                    alignment=ft.Alignment(-1, -1),  # Align to top-left
                     content=ft.Column(
                         [
                             ft.Text("Filters", weight=ft.FontWeight.BOLD),
                             category_filter,
                             topic_filter,
                             max_questions,
-                        ]
+                        ],
+                        scroll=ft.ScrollMode.AUTO,
                     ),
                 ),
                 ft.VerticalDivider(),
                 ft.Container(
                     expand=True,
                     padding=10,
+                    alignment=ft.Alignment(0, -1),  # Align to top-center
                     content=ft.Column(
                         [
-                            ft.ElevatedButton("▶️ Start Quiz", on_click=start_quiz),
+                            initial_start_btn,
                             quiz_block,
-                        ]
+                        ],
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                 ),
-            ]
+            ],
+            expand=True,
+            vertical_alignment=ft.CrossAxisAlignment.START,  # Align row contents to top
         )
     ]
