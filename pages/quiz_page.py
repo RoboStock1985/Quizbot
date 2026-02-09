@@ -144,11 +144,15 @@ def build_quiz_page(
             limit = int(max_questions.value)
         except ValueError:
             limit = 100  # default
-        query = query.limit(limit)
+
+        # Fetch more than limit to get random sampling
+        fetch_limit = max(limit * 3, 100)  # e.g., 3x requested or at least 100
+        query = query.limit(fetch_limit)
 
         result = query.execute().data or []
+
         random.shuffle(result)
-        return result
+        return result[:limit]
 
     def show_vote_stats(q):
         ups, downs = q.get("upvotes", 0), q.get("downvotes", 0)

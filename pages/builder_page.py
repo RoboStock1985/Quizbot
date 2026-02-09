@@ -1,4 +1,5 @@
 import os
+import random
 import flet as ft
 from db import supabase
 from filters import build_multiselect_filter, build_topic_checkbox_filter
@@ -36,13 +37,25 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
     # Lazy load questions
     # -------------------------------
     def load_questions(e):
+
         nonlocal builder_questions
-        query = supabase.table("questions").select("*").limit(100)
+
+        query = supabase.table("questions").select("*")
+
         if selected_categories and len(selected_categories) != len(categories):
             query = query.in_("category", list(selected_categories))
         if selected_topics and len(selected_topics) != len(topics):
             query = query.in_("topic", list(selected_topics))
+
+        limit = 100
+
+        # Fetch more than limit to get random sampling
+        fetch_limit = max(limit * 3, 100)  # e.g., 3x requested or at least 100
+        query = query.limit(fetch_limit)
+
         builder_questions = query.execute().data or []
+        random.shuffle(builder_questions)
+
         rebuild()
 
     def rebuild():
