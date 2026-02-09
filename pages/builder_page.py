@@ -3,6 +3,7 @@ from db import supabase
 from filters import build_multiselect_filter, build_topic_checkbox_filter
 from config import CATEGORY_COLORS
 import fpdf
+import os
 
 
 def build_builder_page(page, categories, topics, selected_categories, selected_topics, notify):
@@ -51,12 +52,12 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
             padding=10,
         )
 
-    def export_pdf(e):
-
+    async def export_pdf(e):
         if not builder_questions:
             notify("No questions to export")
             return
 
+        # Create PDF in memory
         pdf = fpdf.FPDF()
         pdf.add_page()
         pdf.set_font("Helvetica", size=12)
@@ -64,8 +65,36 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
         for i, q in enumerate(builder_questions, 1):
             pdf.multi_cell(0, 8, f"{i}. {q['question']}\nAnswer: {q['answer']}\n")
 
-        pdf.output("quiz_export.pdf")
-        notify("PDF exported")
+        # Save to temporary file
+        temp_path = "quiz_export.pdf"
+        pdf.output(temp_path)
+
+        # Let user choose where to save
+        save_path = await ft.FilePicker().save_file(
+            file_name="quiz_export.pdf",
+            allowed_extensions=["pdf"],
+        )
+
+        if save_path:
+            try:
+                # Read the temp file and write to chosen location
+                with open(temp_path, "rb") as src:
+                    with open(save_path, "wb") as dst:
+                        dst.write(src.read())
+                
+                # Clean up temp file
+                os.remove(temp_path)
+                notify("✅ PDF exported successfully!")
+            except Exception as ex:
+                notify(f"❌ Error saving PDF: {ex}")
+                # Clean up temp file even on error
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+        else:
+            # User cancelled, clean up temp file
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            notify("Export cancelled")
 
     return [
         ft.Row(
