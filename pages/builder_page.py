@@ -80,16 +80,16 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
     # Build individual question card
     # -------------------------------
     def build_question_card(idx, q):
-        # Expandable text fields
-        q_field = ft.TextField(value=q["question"], multiline=True, expand=True)
-        a_field = ft.TextField(value=q["answer"], multiline=True, expand=True)
+        # ---------------- Text fields ----------------
+        q_field = ft.TextField(value=q["question"], multiline=True, width=300)
+        a_field = ft.TextField(value=q["answer"], multiline=False, width=1000, expand=True)
 
-        # Buttons
+        # ---------------- Buttons ----------------
         up_btn = ft.IconButton(ft.Icons.ARROW_UPWARD)
         down_btn = ft.IconButton(ft.Icons.ARROW_DOWNWARD)
         refresh_btn = ft.IconButton(ft.Icons.REFRESH)
 
-        # Callbacks
+        # ---------------- Move / Refresh handlers ----------------
         def move_up(e):
             if idx == 0:
                 return
@@ -106,8 +106,8 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
             cat = q.get("category")
             query = supabase.table("questions").select("*").eq("category", cat)
             result = query.execute().data or []
-            # Exclude questions already in the list
-            result = [r for r in result if r["question_id"] not in {q["question_id"] for q in builder_questions}]
+            existing_ids = {q["question_id"] for q in builder_questions}
+            result = [r for r in result if r["question_id"] not in existing_ids]
             if result:
                 builder_questions[idx] = random.choice(result)
                 rebuild()
@@ -118,6 +118,7 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
         down_btn.on_click = move_down
         refresh_btn.on_click = refresh_question
 
+        # ---------------- Field change handlers ----------------
         def on_change(e):
             q["question"] = q_field.value
             q["answer"] = a_field.value
@@ -125,25 +126,64 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
         q_field.on_change = on_change
         a_field.on_change = on_change
 
-        # Row: text fields expand, buttons fixed size
+        # ---------------- Badge ----------------
+        global BADGE_MAX_WIDTH
+        if 'BADGE_MAX_WIDTH' not in globals():
+            BADGE_MAX_WIDTH = 0
+
+        # Estimate badge width
+        badge_text_width = max(len(str(q.get("category","")))*8, 50)  # rough estimate
+        BADGE_MAX_WIDTH = max(BADGE_MAX_WIDTH, badge_text_width + 12)
+
+        # Invisible spacer badge
+        spacer_badge = ft.Container(
+            width=BADGE_MAX_WIDTH,
+            visible=False
+        )
+
+        # Actual colored badge (natural size)
+        category_badge = ft.Container(
+            content=ft.Text(
+                q.get("category", ""), 
+                weight=ft.FontWeight.BOLD, 
+                color=ft.Colors.WHITE
+            ),
+            bgcolor=CATEGORY_COLORS.get(q.get("category"), ft.Colors.GREY),
+            padding=ft.Padding(6, 2, 6, 2),
+            border_radius=6,
+            alignment=ft.Alignment(0.5, 0.5)
+        )
+
+        # Wrap the badge in a row with the invisible spacer
+        badge_container = ft.Row(
+            [
+                # spacer_badge,
+                category_badge
+            ],
+            alignment=ft.MainAxisAlignment.START
+        )
+
+        # ---------------- Build row ----------------
         return ft.Container(
             content=ft.Row(
                 [
-                    ft.Text(f"{idx+1}."),          # Index
-                    q_field,                        # Expands
-                    a_field,                        # Expands
-                    ft.Row([up_btn, down_btn, refresh_btn], spacing=10)  # Buttons compact
+                    ft.Text(f"{idx+1}."),
+                    q_field,
+                    a_field,
+                    badge_container,
+                    up_btn,
+                    down_btn,
+                    refresh_btn
                 ],
                 spacing=10,
-                alignment=ft.MainAxisAlignment.START,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER
             ),
             border=ft.border.all(1, ft.Colors.WHITE24),
             border_radius=6,
             padding=10,
         )
 
-
+        
     # -------------------------------
     # PDF Export
     # -------------------------------
@@ -155,7 +195,8 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
         pdf = PDF()
         pdf.add_page()
         for i, q in enumerate(builder_questions, 1):
-            pdf.multi_cell(0, 8, f"{i}. {q['question']}\nAnswer: {q['answer']}\n")
+            category = q.get("category", "No Category")
+            pdf.multi_cell(0, 8, f"{i}. [{category}] {q['question']}\nAnswer: {q['answer']}\n\n")
 
         temp_path = os.path.join(tempfile.gettempdir(), "quiz_export.pdf")
         pdf.output(temp_path)
