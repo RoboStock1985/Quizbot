@@ -25,9 +25,8 @@ def build_quiz_page(
 
     max_questions = ft.Dropdown(
         label="Max Questions",
-        options=[ft.dropdown.Option(str(x)) for x in [1, 10, 20, 50, 100]]
-        + [ft.dropdown.Option("All")],
-        value="All",
+        options=[ft.dropdown.Option(str(x)) for x in [10, 20, 50, 100]],
+        value="100",
         width=200,
     )
 
@@ -46,27 +45,25 @@ def build_quiz_page(
         weight=ft.FontWeight.BOLD, 
         text_align=ft.TextAlign.CENTER,
     )
-    # Fixed height container for question text to prevent movement
     question_container = ft.Container(
         content=question_text,
-        height=120,  # Fixed height for question area
+        height=120,
         width=600,
-        alignment=ft.Alignment(0,0),
+        alignment=ft.Alignment(0, 0),
     )
-    
+
     question_image = ft.Image(src="", width=600, height=350, fit="contain", visible=False)
-    # Fixed height container for image to prevent movement when not visible
     image_container = ft.Container(
         content=question_image,
-        height=350,  # Always reserve space for image
+        height=350,
         width=600,
-        alignment=ft.Alignment(0,0),
+        alignment=ft.Alignment(0, 0),
     )
-    
+
     category_box = ft.Container(padding=6, border_radius=6)
     submitted_by = ft.Text(italic=True)
     answer = ft.TextField(label="Your answer", width=600)
-    feedback = ft.Text(size=16, height=30)  # Fixed height for feedback
+    feedback = ft.Text(size=16, height=30)
     submit_btn = ft.ElevatedButton("Submit")
     next_btn = ft.TextButton("Next", visible=False)
     final_score = ft.Text(size=42, weight=ft.FontWeight.BOLD, visible=False)
@@ -77,6 +74,7 @@ def build_quiz_page(
     voting_row = ft.Row([upvote_btn, downvote_btn, vote_label], alignment=ft.MainAxisAlignment.CENTER)
 
     start_quiz_btn = ft.ElevatedButton("▶️ Start New Quiz", visible=False)
+    initial_start_btn = ft.ElevatedButton("▶️ Start New Quiz", visible=True)
 
     quiz_block = ft.Column(
         [
@@ -98,9 +96,6 @@ def build_quiz_page(
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         spacing=10,
     )
-
-    # Start button that appears before quiz begins
-    initial_start_btn = ft.ElevatedButton("▶️ Start New Quiz", visible=True)
 
     # ---------------- Helper Functions ----------------
     def notify_vote(msg):
@@ -136,16 +131,23 @@ def build_quiz_page(
     upvote_btn.on_click = lambda e: vote(1)
     downvote_btn.on_click = lambda e: vote(-1)
 
+    # ---------------- Optimized: Lazy question fetch ----------------
     def get_questions():
         query = supabase.table("questions").select("*")
+
         if selected_categories and len(selected_categories) != len(categories):
             query = query.in_("category", list(selected_categories))
         if selected_topics and len(selected_topics) != len(topics):
             query = query.in_("topic", list(selected_topics))
+
+        try:
+            limit = int(max_questions.value)
+        except ValueError:
+            limit = 100  # default
+        query = query.limit(limit)
+
         result = query.execute().data or []
         random.shuffle(result)
-        if max_questions.value != "All":
-            result = result[: int(max_questions.value)]
         return result
 
     def show_vote_stats(q):
@@ -169,14 +171,10 @@ def build_quiz_page(
         current_q.clear()
         current_q.update(q)
 
-        # Reset voting buttons
         upvote_btn.disabled = False
         downvote_btn.disabled = False
 
-        # Question text
         question_text.value = wrap_text(q.get("question", ""))
-
-        # Image
         if q.get("image_url"):
             question_image.src = q["image_url"]
             question_image.visible = True
@@ -184,11 +182,9 @@ def build_quiz_page(
             question_image.src = ""
             question_image.visible = False
 
-        # Category
         category_box.content = ft.Text(q.get("category",""), weight=ft.FontWeight.BOLD)
         category_box.bgcolor = CATEGORY_COLORS.get(q.get("category"), ft.Colors.GREY)
 
-        # Answer & feedback
         answer.value = ""
         answer.disabled = False
         feedback.value = ""
@@ -196,7 +192,6 @@ def build_quiz_page(
         final_score.visible = False
         start_quiz_btn.visible = False
 
-        # Progress
         progress.value = len(asked_ids) / len(question_pool)
         progress_label.value = f"Question {len(asked_ids)} of {len(question_pool)}"
         submitted_by.value = f"Submitted by: {safe_data(q.get('submitted_by'))}"
@@ -239,14 +234,14 @@ def build_quiz_page(
     initial_start_btn.on_click = start_quiz
     start_quiz_btn.on_click = start_quiz
 
-# ---------------- Layout ----------------
+    # ---------------- Layout ----------------
     return [
         ft.Row(
             [
                 ft.Container(
                     width=280,
                     padding=10,
-                    alignment=ft.Alignment(-1, -1),  # Align to top-left
+                    alignment=ft.Alignment(-1, -1),
                     content=ft.Column(
                         [
                             ft.Text("Filters", weight=ft.FontWeight.BOLD),
@@ -261,7 +256,7 @@ def build_quiz_page(
                 ft.Container(
                     expand=True,
                     padding=10,
-                    alignment=ft.Alignment(0, -1),  # Align to top-center
+                    alignment=ft.Alignment(0, -1),
                     content=ft.Column(
                         [
                             initial_start_btn,
@@ -272,6 +267,6 @@ def build_quiz_page(
                 ),
             ],
             expand=True,
-            vertical_alignment=ft.CrossAxisAlignment.START,  # Align row contents to top
+            vertical_alignment=ft.CrossAxisAlignment.START,
         )
     ]

@@ -68,16 +68,17 @@ def build_add_question_page(page, categories, selected_category=None, selected_t
     )
 
     # ---------- Fields ----------
-    question_field = ft.TextField(label="Question", multiline=True, min_lines=3, width=600)
-    answer_field = ft.TextField(label="Answer", width=600)
+    question_field = ft.TextField(label="Question", multiline=True, min_lines=3, width=600, border_color=ft.Colors.with_opacity(0.4, ft.Colors.WHITE))
+    answer_field = ft.TextField(label="Answer", width=600, border_color=ft.Colors.with_opacity(0.4, ft.Colors.WHITE))
     category_field = ft.Dropdown(
         label="Category",
         options=[ft.dropdown.Option(c) for c in categories],
         width=300,
         value=selected_category,
+        border_color=ft.Colors.with_opacity(0.4, ft.Colors.WHITE)
     )
-    topic_field = ft.TextField(label="Topic", width=300, value=selected_topic)
-    submitted_by_field = ft.TextField(label="Submitted by", width=300, value=submitted_by)
+    topic_field = ft.TextField(label="Topic", width=300, value=selected_topic, border_color=ft.Colors.with_opacity(0.4, ft.Colors.WHITE))
+    submitted_by_field = ft.TextField(label="Submitted by", width=300, value=submitted_by, border_color=ft.Colors.with_opacity(0.4, ft.Colors.WHITE))
     feedback = ft.Text(size=14)
 
     # ---------- Add Question Logic ----------
@@ -139,7 +140,7 @@ def build_add_question_page(page, categories, selected_category=None, selected_t
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         ),
         padding=30,
-        border=ft.border.all(1, ft.Colors.with_opacity(0.2, ft.Colors.WHITE)),
+        border=ft.border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
         border_radius=12,
         width=700,
         bgcolor=ft.Colors.with_opacity(0.05, ft.Colors.WHITE),
