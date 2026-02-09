@@ -26,7 +26,7 @@ def build_quiz_page(
     max_questions = ft.Dropdown(
         label="Max Questions",
         options=[ft.dropdown.Option(str(x)) for x in [10, 20, 50, 100]],
-        value="100",
+        value="10",
         width=200,
     )
 
@@ -249,9 +249,9 @@ def build_quiz_page(
                     content=ft.Column(
                         [
                             ft.Text("Filters", weight=ft.FontWeight.BOLD),
+                            max_questions,
                             category_filter,
                             topic_filter,
-                            max_questions,
                         ],
                         scroll=ft.ScrollMode.AUTO,
                     ),
