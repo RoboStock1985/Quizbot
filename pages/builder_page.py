@@ -2,9 +2,22 @@ import flet as ft
 from db import supabase
 from filters import build_multiselect_filter, build_topic_checkbox_filter
 from config import CATEGORY_COLORS
+import fpdf
+import io
+from fpdf import FPDF
+
+import flet as ft
+from fpdf import FPDF
+import tempfile
+import os
+
+
 
 
 def build_builder_page(page, categories, topics, selected_categories, selected_topics, notify):
+
+    save_picker = ft.FilePicker()
+    page.overlay.append(save_picker)
 
     category_filter = build_multiselect_filter(
         "Categories", categories, selected_categories, page, CATEGORY_COLORS
@@ -51,21 +64,39 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
         )
 
     def export_pdf(e):
-        import fpdf
-
         if not builder_questions:
             notify("No questions to export")
             return
 
-        pdf = fpdf.FPDF()
+        pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Helvetica", size=12)
 
         for i, q in enumerate(builder_questions, 1):
-            pdf.multi_cell(0, 8, f"{i}. {q['question']}\nAnswer: {q['answer']}\n")
+            pdf.multi_cell(
+                0,
+                8,
+                f"{i}. {q['question']}\nAnswer: {q['answer']}\n",
+            )
 
-        pdf.output("quiz_export.pdf")
-        notify("PDF exported")
+        # Write PDF to a temp file
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        pdf.output(tmp.name)
+        tmp.close()
+
+        def on_save_result(e: ft.FilePickerResultEvent):
+            if e.path:
+                with open(tmp.name, "rb") as src, open(e.path, "wb") as dst:
+                    dst.write(src.read())
+                notify("PDF downloaded")
+            os.unlink(tmp.name)
+
+        save_picker.on_result = on_save_result
+        save_picker.save_file(
+            file_name="quiz_export.pdf",
+            allowed_extensions=["pdf"],
+        )
+
 
     return [
         ft.Row(
