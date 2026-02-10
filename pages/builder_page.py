@@ -204,10 +204,10 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
         file_picker = ft.FilePicker()
 
         # add in src_bytes to make this work in web environments where we can't write to temp files
-        with open(temp_path, "rb") as f:
-            file_picker.src_bytes = f.read()
+        # with open(temp_path, "rb") as f:
+        #     file_picker.src_bytes = f.read()
             
-        save_path = await file_picker.save_file(file_name="quiz_export.pdf", allowed_extensions=["pdf"])
+        save_path = await file_picker.save_file(file_name="quiz_export.pdf", allowed_extensions=["pdf"], src_bytes=open(temp_path, "rb").read())
 
         if save_path:
             if not save_path.lower().endswith(".pdf"):
