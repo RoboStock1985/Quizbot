@@ -238,30 +238,39 @@ def build_quiz_page(
     start_quiz_btn.on_click = start_quiz
 
     # ---------------- Filter Sidebar ----------------
+    # State variable
     filters_visible = True
+
     def toggle_filters(e):
         nonlocal filters_visible
         filters_visible = not filters_visible
-        filters_container.visible = filters_visible
+        filters_column.visible = filters_visible
         page.update()
+
+    # Sidebar container
+    filters_column = ft.Column(
+        [
+            ft.Row(
+                [
+                    ft.Text("Filters", weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
+                    # ft.IconButton(ft.Icons.CLOSE, icon_color=ft.Colors.WHITE, on_click=toggle_filters)
+                ],
+                spacing=10,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            ft.Container(height=25),
+            max_questions,
+            category_filter,
+            topic_filter,
+        ],
+        scroll=ft.ScrollMode.AUTO
+    )
 
     filters_container = ft.Container(
         width=280,
         padding=10,
         bgcolor=ft.Colors.BLACK,
-        alignment=ft.Alignment(-1, -1),
-        content=ft.Column(
-            [
-                ft.Row([
-                    ft.Text("Filters", weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
-                ]),
-                ft.Container(height=25),
-                max_questions,
-                category_filter,
-                topic_filter,
-            ],
-            scroll=ft.ScrollMode.AUTO,
-        ),
+        content=filters_column
     )
 
     show_filters_btn = ft.FloatingActionButton(
