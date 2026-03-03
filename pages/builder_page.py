@@ -40,6 +40,39 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
     question_list = ft.Column(spacing=8, scroll=True)
     builder_questions = []
 
+    # ---------------- Filter Sidebar ----------------
+    filters_visible = True
+    def toggle_filters(e):
+        nonlocal filters_visible
+        filters_visible = not filters_visible
+        filters_container.visible = filters_visible
+        page.update()
+
+    filters_container = ft.Container(
+        width=280,
+        padding=10,
+        bgcolor=ft.Colors.BLACK,
+        alignment=ft.Alignment(-1, -1),
+        content=ft.Column(
+            [
+                ft.Row([
+                    ft.Text("Filters", weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
+                ]),
+                ft.Container(height=25),
+                max_questions,
+                category_filter,
+                topic_filter,
+            ],
+            scroll=ft.ScrollMode.AUTO,
+        ),
+    )
+
+    show_filters_btn = ft.FloatingActionButton(
+        icon=ft.Icons.FILTER_LIST,
+        on_click=toggle_filters,
+        tooltip="Show/Hide Filters",
+    )
+
     # -------------------------------
     # Rebuild question list UI
     # -------------------------------
@@ -50,7 +83,7 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
         page.update()
 
     # -------------------------------
-    # Load questions (lazy)
+    # Load questions
     # -------------------------------
     def load_questions(e):
         nonlocal builder_questions
@@ -66,12 +99,12 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
         except ValueError:
             limit = 100
 
-        fetch_limit = max(limit * 3, 100)  # fetch extra for randomness
+        fetch_limit = max(limit * 3, 100)
         query = query.limit(fetch_limit)
         builder_questions = query.execute().data or []
 
         random.shuffle(builder_questions)
-        builder_questions = builder_questions[:limit]  # cap to max
+        builder_questions = builder_questions[:limit]
 
         rebuild()
         notify(f"Loaded {len(builder_questions)} questions")
@@ -80,25 +113,20 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
     # Build individual question card
     # -------------------------------
     def build_question_card(idx, q):
-        # ---------------- Text fields ----------------
         q_field = ft.TextField(value=q["question"], multiline=True, width=300)
         a_field = ft.TextField(value=q["answer"], multiline=False, width=1000, expand=True)
 
-        # ---------------- Buttons ----------------
         up_btn = ft.IconButton(ft.Icons.ARROW_UPWARD)
         down_btn = ft.IconButton(ft.Icons.ARROW_DOWNWARD)
         refresh_btn = ft.IconButton(ft.Icons.REFRESH)
 
-        # ---------------- Move / Refresh handlers ----------------
         def move_up(e):
-            if idx == 0:
-                return
+            if idx == 0: return
             builder_questions[idx], builder_questions[idx-1] = builder_questions[idx-1], builder_questions[idx]
             rebuild()
 
         def move_down(e):
-            if idx == len(builder_questions)-1:
-                return
+            if idx == len(builder_questions)-1: return
             builder_questions[idx], builder_questions[idx+1] = builder_questions[idx+1], builder_questions[idx]
             rebuild()
 
@@ -118,7 +146,6 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
         down_btn.on_click = move_down
         refresh_btn.on_click = refresh_question
 
-        # ---------------- Field change handlers ----------------
         def on_change(e):
             q["question"] = q_field.value
             q["answer"] = a_field.value
@@ -130,40 +157,22 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
         global BADGE_MAX_WIDTH
         if 'BADGE_MAX_WIDTH' not in globals():
             BADGE_MAX_WIDTH = 0
-
-        # Estimate badge width
-        badge_text_width = max(len(str(q.get("category","")))*8, 50)  # rough estimate
+        badge_text_width = max(len(str(q.get("category","")))*8, 50)
         BADGE_MAX_WIDTH = max(BADGE_MAX_WIDTH, badge_text_width + 12)
 
-        # Invisible spacer badge
-        spacer_badge = ft.Container(
-            width=BADGE_MAX_WIDTH,
-            visible=False
-        )
-
-        # Actual colored badge (natural size)
+        spacer_badge = ft.Container(width=BADGE_MAX_WIDTH, visible=False)
         category_badge = ft.Container(
             content=ft.Text(
-                q.get("category", ""), 
-                weight=ft.FontWeight.BOLD, 
-                color=ft.Colors.WHITE
+                q.get("category", ""), weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE
             ),
             bgcolor=CATEGORY_COLORS.get(q.get("category"), ft.Colors.GREY),
-            padding=ft.Padding(6, 2, 6, 2),
+            padding=ft.Padding(6,2,6,2),
             border_radius=6,
-            alignment=ft.Alignment(0.5, 0.5)
+            alignment=ft.Alignment(0.5,0.5)
         )
 
-        # Wrap the badge in a row with the invisible spacer
-        badge_container = ft.Row(
-            [
-                # spacer_badge,
-                category_badge
-            ],
-            alignment=ft.MainAxisAlignment.START
-        )
+        badge_container = ft.Row([spacer_badge, category_badge], alignment=ft.MainAxisAlignment.START)
 
-        # ---------------- Build row ----------------
         return ft.Container(
             content=ft.Row(
                 [
@@ -183,7 +192,6 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
             padding=10,
         )
 
-        
     # -------------------------------
     # PDF Export
     # -------------------------------
@@ -195,25 +203,20 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
         pdf = PDF()
         pdf.add_page()
         for i, q in enumerate(builder_questions, 1):
-            category = q.get("category", "No Category")
+            category = q.get("category","No Category")
             pdf.multi_cell(0, 8, f"{i}. [{category}] {q['question']}\nAnswer: {q['answer']}\n\n")
 
         temp_path = os.path.join(tempfile.gettempdir(), "quiz_export.pdf")
         pdf.output(temp_path)
 
         file_picker = ft.FilePicker()
-
-        # add in src_bytes to make this work in web environments where we can't write to temp files
-        # with open(temp_path, "rb") as f:
-        #     file_picker.src_bytes = f.read()
-            
-        save_path = await file_picker.save_file(file_name="quiz_export.pdf", allowed_extensions=["pdf"], src_bytes=open(temp_path, "rb").read())
+        save_path = await file_picker.save_file(file_name="quiz_export.pdf", allowed_extensions=["pdf"],
+                                               src_bytes=open(temp_path,"rb").read())
 
         if save_path:
-            if not save_path.lower().endswith(".pdf"):
-                save_path += ".pdf"
+            if not save_path.lower().endswith(".pdf"): save_path += ".pdf"
             try:
-                with open(temp_path, "rb") as src, open(save_path, "wb") as dst:
+                with open(temp_path,"rb") as src, open(save_path,"wb") as dst:
                     dst.write(src.read())
                 notify("✅ PDF exported successfully!")
             except Exception as ex:
@@ -221,48 +224,42 @@ def build_builder_page(page, categories, topics, selected_categories, selected_t
         else:
             notify("Export cancelled")
 
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        if os.path.exists(temp_path): os.remove(temp_path)
 
-    # -------------------------------
-    # Layout
-    # -------------------------------
+    # ---------------- Layout ----------------
     return [
-        ft.Row(
+        ft.Stack(
             [
-                ft.Container(
-                    width=280,
-                    padding=10,
-                    alignment=ft.Alignment(-1, -1),
-                    content=ft.Column(
-                        [
-                            ft.Text("Filters", weight=ft.FontWeight.BOLD),
-                            max_questions,
-                            category_filter,
-                            topic_filter,
-                        ],
-                        scroll=ft.ScrollMode.AUTO,
-                    ),
-                ),
-                ft.VerticalDivider(),
-                ft.Container(
+                ft.Row(
+                    [
+                        filters_container,
+                        ft.VerticalDivider(),
+                        ft.Container(
+                            expand=True,
+                            padding=10,
+                            content=ft.Column(
+                                [
+                                    ft.Row([
+                                        ft.ElevatedButton("📥 Load Questions", on_click=load_questions),
+                                        ft.ElevatedButton(
+                                            "📄 Export PDF",
+                                            on_click=lambda e: asyncio.create_task(export_pdf(page, builder_questions, notify))
+                                        ),
+                                    ]),
+                                    question_list,
+                                ]
+                            ),
+                        ),
+                    ],
                     expand=True,
-                    padding=10,
-                    content=ft.Column(
-                        [
-                            ft.Row([
-                                ft.ElevatedButton("📥 Load Questions", on_click=load_questions),
-                                ft.ElevatedButton(
-                                    "📄 Export PDF",
-                                    on_click=lambda e: asyncio.create_task(export_pdf(page, builder_questions, notify))
-                                ),
-                            ]),
-                            question_list,
-                        ],
-                    ),
+                    vertical_alignment=ft.CrossAxisAlignment.START,
                 ),
-            ],
-            expand=True,
-            vertical_alignment=ft.CrossAxisAlignment.START,
+                ft.Container(
+                    content=show_filters_btn,
+                    # alignment=ft.Alignment(-0.95, -0.95)  # top-left corner
+                    alignment=ft.Alignment(-1, -1),  # top-right corner of filters
+                    padding=ft.Padding(5, 0, 0, 5),
+                ),
+            ]
         )
     ]

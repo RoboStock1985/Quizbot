@@ -8,6 +8,7 @@ def main(page: ft.Page):
 
     page.title = "Trivia on Tap 🍺"
     page.theme_mode = ft.ThemeMode.DARK
+    # page.dark_theme = ft.Theme(color_scheme_seed=ft.Colors.BLACK)
     page.padding = 20
     page.scroll = ft.ScrollMode.AUTO
 

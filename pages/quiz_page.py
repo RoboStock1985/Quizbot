@@ -41,8 +41,8 @@ def build_quiz_page(
     progress = ft.ProgressBar(width=600)
     progress_label = ft.Text()
     question_text = ft.Text(
-        size=30, 
-        weight=ft.FontWeight.BOLD, 
+        size=30,
+        weight=ft.FontWeight.BOLD,
         text_align=ft.TextAlign.CENTER,
     )
     question_container = ft.Container(
@@ -145,8 +145,7 @@ def build_quiz_page(
         except ValueError:
             limit = 100  # default
 
-        # Fetch more than limit to get random sampling
-        fetch_limit = max(limit * 3, 100)  # e.g., 3x requested or at least 100
+        fetch_limit = max(limit * 3, 100)  # fetch extra for randomness
         query = query.limit(fetch_limit)
 
         result = query.execute().data or []
@@ -238,25 +237,54 @@ def build_quiz_page(
     initial_start_btn.on_click = start_quiz
     start_quiz_btn.on_click = start_quiz
 
+    # ---------------- Filter Sidebar ----------------
+    filters_visible = True
+    def toggle_filters(e):
+        nonlocal filters_visible
+        filters_visible = not filters_visible
+        filters_container.visible = filters_visible
+        page.update()
+
+    filters_container = ft.Container(
+        width=280,
+        padding=10,
+        bgcolor=ft.Colors.BLACK,
+        alignment=ft.Alignment(-1, -1),
+        content=ft.Column(
+            [
+                ft.Row([
+                    ft.Text("Filters", weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
+                ]),
+                ft.Container(height=25),
+                max_questions,
+                category_filter,
+                topic_filter,
+            ],
+            scroll=ft.ScrollMode.AUTO,
+        ),
+    )
+
+    show_filters_btn = ft.FloatingActionButton(
+        icon=ft.Icons.FILTER_LIST,
+        on_click=toggle_filters,
+        tooltip="Show/Hide Filters",
+    )
+
     # ---------------- Layout ----------------
     return [
         ft.Row(
             [
-                ft.Container(
-                    width=280,
-                    padding=10,
-                    alignment=ft.Alignment(-1, -1),
-                    content=ft.Column(
-                        [
-                            ft.Text("Filters", weight=ft.FontWeight.BOLD),
-                            max_questions,
-                            category_filter,
-                            topic_filter,
-                        ],
-                        scroll=ft.ScrollMode.AUTO,
-                    ),
+                ft.Stack(
+                    [
+                        filters_container,
+                        ft.Container(
+                            content=show_filters_btn,
+                            alignment=ft.Alignment(1, -1),  # top-right corner of filters
+                            padding=ft.Padding(5, 0, 0, 5),
+                        ),
+                    ],
                 ),
-                ft.VerticalDivider(),
+                ft.VerticalDivider(width=2),
                 ft.Container(
                     expand=True,
                     padding=10,
